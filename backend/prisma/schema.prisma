@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TransactionStatus {
+  COMPLETED
+  PENDING
+  FAILED
+  REVERSED
+}
+
+enum DisputeStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ADDITIONAL_INFORMATION_REQUIRED
+  RESOLVED
+  REJECTED
+}
+
+model Customer {
+  id             String   @id @default(uuid())
+  customerNumber String   @unique
+  firstName      String
+  lastName       String
+  email          String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  transactions Transaction[]
+  disputes     Dispute[]
+
+  @@index([lastName, firstName])
+}
+
+model Transaction {
+  id              String            @id @default(uuid())
+  customerId      String
+  reference       String            @unique
+  amount          Decimal           @db.Decimal(19, 4)
+  currency        String            @default("ZAR")
+  description     String
+  transactionDate DateTime
+  status          TransactionStatus
+  createdAt       DateTime          @default(now())
+
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  disputes Dispute[]
+
+  @@index([customerId])
+  @@index([transactionDate])
+  @@index([status])
+  @@index([customerId, transactionDate])
+}
+
+model Dispute {
+  id            String        @id @default(uuid())
+  transactionId String
+  customerId    String
+  reason        String
+  description   String
+  status        DisputeStatus @default(SUBMITTED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  resolvedAt    DateTime?
+
+  transaction Transaction      @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  customer    Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  history     DisputeHistory[]
+
+  @@index([transactionId])
+  @@index([customerId])
+  @@index([status])
+  @@index([customerId, createdAt])
+}
+
+model DisputeHistory {
+  id        String        @id @default(uuid())
+  disputeId String
+  status    DisputeStatus
+  comment   String?
+  createdAt DateTime      @default(now())
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId, createdAt])
+}
